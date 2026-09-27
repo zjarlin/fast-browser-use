@@ -1,4 +1,4 @@
-"""All inference stays local: single-token action selection and on-demand field text."""
+"""本地候选评分，或由 Codex 供应商返回经过校验的结构化动作。"""
 
 import copy
 import itertools
@@ -37,8 +37,8 @@ TORCH_MODELS = {
 
 def resolve_backend(backend=None):
     backend = backend or os.environ.get("FBU_BACKEND", "auto")
-    if backend not in {"auto", "mlx", "torch"}:
-        raise ValueError("FBU_BACKEND must be auto, mlx or torch")
+    if backend not in {"auto", "mlx", "torch", "codex"}:
+        raise ValueError("FBU_BACKEND must be auto, mlx, torch or codex")
     if backend == "auto":
         return "mlx" if platform.system() == "Darwin" and platform.machine() == "arm64" else "torch"
     return backend
@@ -380,7 +380,11 @@ def get_model():
     global _engine
     with _init_lock:
         if _engine is None:
-            if resolve_backend() == "torch":
+            if resolve_backend() == "codex":
+                from .codex_backend import CodexModel
+
+                _engine = CodexModel()
+            elif resolve_backend() == "torch":
                 from .torch_backend import TorchModel
 
                 _engine = TorchModel()
@@ -392,6 +396,8 @@ def get_model():
 def choose(state, goal, history, *, task=None):
     started = time.perf_counter()
     engine = get_model()
+    if engine.backend == "codex":
+        return engine.choose(state, goal, history, task=task)
     deliberate = os.environ.get("FBU_REASONING") == "1"
     full_goal = os.environ.get("FBU_PLAN", "0") == "0"
     mode = os.environ.get("FBU_DECISION_MODE", "auto")

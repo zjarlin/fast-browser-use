@@ -4,6 +4,36 @@
 
 # Fast Browser Use
 
+> 本机版本新增可选的 `codex` 后端：复用 Codex 自定义供应商的 Responses API 和凭据来源，
+> 用指定模型选择已经观察到的浏览器动作。下文的纯本地推理、单步 logits 打分与离线性能数据仅适用于 MLX/PyTorch。
+
+## 复用 Codex 模型
+
+```bash
+fbu run 'https://example.com/' --backend codex --model deepseek-v4-flash \
+  --goal '用户希望完成的操作' --trace /tmp/browser-task.json
+```
+
+读取 `${CODEX_HOME:-~/.codex}/config.toml` 中的 `model_provider`、供应商 `base_url`、`wire_api` 和认证配置。
+支持 `auth.command`、`env_key`、`experimental_bearer_token`、静态或环境 HTTP 请求头；没有供应商凭据时可读取
+同目录 `auth.json` 的 `OPENAI_API_KEY`，不使用 ChatGPT OAuth。凭据不写入浏览器日志或另存副本。
+未传 `--model` 时使用 Codex 当前模型；模型是否可调用以实际 API 请求为准。
+
+在 `~/.config/fast-browser-use/config.toml` 保存专用默认值，可以固定浏览器使用的小模型，不改变 Codex 的主模型：
+
+```toml
+backend = "codex"
+model = "deepseek-v4-flash"
+reasoning_effort = "none"
+```
+
+配置目录遵循 `XDG_CONFIG_HOME`。优先级为 CLI 参数、已有环境变量/工作目录 `.env`、上述用户配置。
+切回本地时同时显式指定 `--backend mlx --model mlx-community/Qwen3.5-9B-4bit`，避免把远程模型名传给本地加载器。
+
+`codex` 后端会把任务、可见页面内容和候选动作发送到已配置供应商，使用普通 API 额度；它通过结构化 JSON 选动作，
+不伪造 logits 或置信度，也不具备本地模型的离线性质。动作仍由本地浏览器执行，未知候选、无效字段与过期页面会拒绝执行，
+`--expect-*` 仍独立验收最终状态。更换模型不会自动修复 DOM 观察器未暴露的控件。
+
 **面向 Claude Code、Codex、OpenCode 等 Agent 的端侧极速“系统 1”浏览器自动化引擎与 Agent Skill。**  
 *基于 Qwen3.5-9B/Qwen3.5-35B-A3B，通过 MLX 或 PyTorch（CUDA / CPU）本地运行。零云端推理、秒级反射决策、从结构上彻底杜绝选择器幻觉。*
 

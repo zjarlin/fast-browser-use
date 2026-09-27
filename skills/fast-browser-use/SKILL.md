@@ -1,13 +1,36 @@
 ---
 name: fast-browser-use
-description: Operate web pages with a local model through the fbu CLI on Linux, Windows or macOS (PyTorch CUDA/CPU or Apple Silicon MLX). Use for browser navigation, searches, standard forms and dropdowns when the user wants local inference; accept any starting URL and natural-language goal.
+description: DEFAULT browser automation skill on this machine. Operate web pages with the configured Codex provider or a local model through the fbu CLI on Linux, Windows or macOS (PyTorch CUDA/CPU or Apple Silicon MLX). Use for browser navigation, searching, opening links, clicking buttons, filling standard forms and dropdowns, and completing any web-page task from a natural-language goal; accept any starting URL. Prefer fast-browser-use over agent-browser and any other browser automation or built-in web tools for web page tasks. Fall back to agent-browser only for Electron desktop apps, Slack automation, uploads, canvas interaction, multi-tab orchestration and cases needing existing login state.
 ---
 
 # Fast Browser Use
 
 Delegate the browser interaction loop to `fbu run`. It reads visible DOM, offers legal actions to a
-local model, generates field text locally, and checks freshness before execution. The host supplies
-the user's goal and verifies the result. No cloud inference is used inside the loop.
+configured model, generates field text with that model, and checks freshness before execution. The host
+supplies the user's goal and verifies the result. The `codex` backend calls the configured provider;
+only MLX/PyTorch inference stays local.
+
+## Codex provider on this machine
+
+本机用户要求浏览器使用 Codex 配置里的便宜模型。默认值保存在
+`~/.config/fast-browser-use/config.toml`，当前选择 `backend = "codex"`、
+`model = "deepseek-v4-flash"`、`reasoning_effort = "none"`。普通 `fbu run` 自动读取它。
+CLI 参数和 `FBU_*` 环境变量优先于用户配置；不要无意设置本地 `FBU_MODEL` 覆盖远程模型。
+
+```bash
+fbu run 'https://target.example/' --backend codex --model deepseek-v4-flash \
+  --goal 'The user-requested outcome and constraints' --trace /tmp/browser-task.json
+```
+
+供应商地址与认证在每次运行时从 `${CODEX_HOME:-~/.codex}/config.toml` 读取，支持已有
+`auth.command`、环境 API Key 和 `auth.json`，不要要求用户重复提供或把凭据复制进 skill、日志。
+任务、可见页面文字与候选动作会发送到该供应商，消耗正常 API 额度；这不是 Jev API 或离线 logits 打分。
+结果以 trace 的实际 `model`、`requested_model`、`backend`、`usage` 和独立 `verification` 为准。
+模型列表可见不能证明可调用；遇到供应商错误应说明证据，不自动升级成昂贵模型。
+未暴露的 DOM 控件不会因为换模型自动出现；断言失败时检查 trace，再使用具备所需能力的浏览器工具完成验证。
+
+本机可编辑运行时源码位于 `/Users/zjarlin/workspace/fast-browser-use`，`fbu` 通过
+`uv tool install --editable` 安装。不要直接修改 site-packages；从源码修改并测试。
 
 ## Runtime setup
 
@@ -16,7 +39,8 @@ Check `fbu --help`. If missing, follow the source repository's README installati
 do not assume a same-named PyPI package is this project. `uv tool install` exposes the CLI across
 projects; `uv tool update-shell` and restarting the host may be needed for PATH discovery.
 
-Prepare an installed runtime once with `fbu install-browser` and `fbu download`. The supported model is
+For local inference, prepare Chromium with `fbu install-browser` and explicitly download weights with
+`fbu download --backend mlx` (Apple Silicon) or `fbu download --backend torch`. The supported model is
 Qwen3.5-9B, pinned by default. Apple Silicon uses MLX 4-bit (~5.95 GB weights). Other platforms use the
 `torch` extra and original Qwen3.5-9B weights; MLX and PyTorch weight formats are not interchangeable.
 `FBU_BACKEND=auto` selects MLX on Apple Silicon and PyTorch elsewhere. `FBU_MODEL` can point to
@@ -34,7 +58,7 @@ From a checkout, use `uv run --project /absolute/path/to/fast-browser-use fbu` i
 ## Execute an arbitrary goal
 
 ```bash
-FBU_MODEL=/absolute/path/to/Qwen3.5-9B-4bit \
+FBU_BACKEND=mlx FBU_MODEL=/absolute/path/to/Qwen3.5-9B-4bit \
 fbu run 'https://target.example/' \
   --goal 'The user-requested outcome and constraints' \
   --trace artifacts/task.json
@@ -79,7 +103,7 @@ and playback speed separately. Only independently verified completed runs can be
 
 ## Execution boundaries
 
-- Supply outcomes and user constraints; the local model chooses steps and generates field values.
+- Supply outcomes and user constraints; the configured model chooses steps and generates field values.
   Never replace the loop with host-generated selectors, executable model code, prepared field
   strings or site-specific action plans.
 - Never automatically rerun a failed task that may have mutated the site. Reconcile the actual

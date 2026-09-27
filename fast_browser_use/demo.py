@@ -3,6 +3,7 @@
 import json
 import os
 import secrets
+import tomllib
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -28,6 +29,13 @@ def load_environment():
             if line and not line.startswith("#") and "=" in line:
                 key, value = line.split("=", 1)
                 os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
+    config_dir = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    config_path = config_dir / "fast-browser-use" / "config.toml"
+    if config_path.exists():
+        config = tomllib.loads(config_path.read_text())
+        for key in ("backend", "model", "reasoning_effort"):
+            if key in config:
+                os.environ.setdefault("FBU_" + key.upper(), str(config[key]))
 
 
 class Inspector:
@@ -86,7 +94,7 @@ def serve(port=8767):
     inspector = Inspector(origin)
     worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="browser")
     # Exclude weight loading from the warm demo; disclose this measurement boundary.
-    print("Loading local Qwen3.5-9B…", flush=True)
+    print("Initializing the configured browser model…", flush=True)
     worker.submit(get_model).result()
 
     class Handler(BaseHTTPRequestHandler):

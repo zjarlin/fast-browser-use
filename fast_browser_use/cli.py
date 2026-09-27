@@ -1,4 +1,4 @@
-"""Local-only CLI, including an optional download/convert path from ModelScope."""
+"""本地浏览器 CLI，支持本地推理和 Codex 自定义供应商。"""
 
 import argparse
 import json
@@ -12,7 +12,7 @@ from .demo import load_environment
 
 def main():
     load_environment()
-    parser = argparse.ArgumentParser(description="Local Qwen3.5-9B browser-use skill. Host agents invoke `fbu run`.")
+    parser = argparse.ArgumentParser(description="Browser automation with local models or a Codex Responses provider.")
     sub = parser.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="Run a natural-language goal on a URL (skill entrypoint)")
     run.add_argument("url")
@@ -39,7 +39,8 @@ def main():
     web = sub.add_parser("serve", help="Optional loopback inspector for debugging candidate scores")
     web.add_argument("--port", type=int, default=int(os.environ.get("FBU_PORT", "8767")))
     for command in (run, recording, download, web):
-        command.add_argument("--backend", choices=["auto", "mlx", "torch"], help="Overrides FBU_BACKEND")
+        backends = ["auto", "mlx", "torch"] if command is download else ["auto", "mlx", "torch", "codex"]
+        command.add_argument("--backend", choices=backends, help="Overrides FBU_BACKEND and user configuration")
         command.add_argument("--model", help="Model name, alias (9b, 35b) or local directory (FBU_MODEL)")
     for command in (run, recording, web):
         command.add_argument("--device", help="PyTorch device: auto, cpu, cuda or cuda:N (FBU_DEVICE)")
@@ -76,6 +77,8 @@ def main():
         from .model import MODELSCOPE_REVISION, model_source, resolve_backend
 
         backend = resolve_backend()
+        if backend == "codex":
+            parser.error("The codex backend uses an API; select --backend mlx or torch to download local weights")
         if args.source == "mlx":
             if args.backend == "torch":
                 parser.error("--source mlx downloads MLX weights; use --source huggingface with --backend torch")

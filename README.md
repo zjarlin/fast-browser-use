@@ -4,6 +4,18 @@
 
 # Fast Browser Use
 
+> This local checkout also supports an optional `codex` backend using the configured Codex Responses provider.
+> Offline inference, single-token logits scoring, and local benchmarks below apply only to MLX/PyTorch.
+> See [Codex model setup](README.zh-CN.md#复用-codex-模型) for configuration and credential handling.
+
+```bash
+fbu run 'https://example.com/' --backend codex --model deepseek-v4-flash \
+  --goal 'The user-requested outcome' --trace /tmp/browser-task.json
+```
+
+The remote backend sends the task, visible page content and observed choices to your configured provider.
+It reuses Codex credentials and validates a structured action choice, without inventing probabilities.
+
 **An ultra-fast, local-first "System 1" browser automation engine & Agent Skill for Claude Code, Codex, and Cursor.**  
 *Powered by local Qwen3.5-9B / Qwen3.5-35B-A3B via MLX or PyTorch (CUDA / CPU). Zero cloud inference, second-level reflexes, zero selector hallucinations.*
 

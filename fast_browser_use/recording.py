@@ -88,7 +88,8 @@ def record(output=None, *, scenario=None, url=None, goal=None, expected=None):
             server.server_close()
         raise
     error = None
-    model_label = "LOCAL " + engine.name.rsplit("/", 1)[-1].replace("-it-4bit", "").replace("-", " ").upper()
+    model_prefix = "CODEX " if engine.backend == "codex" else "LOCAL "
+    model_label = model_prefix + engine.name.rsplit("/", 1)[-1].replace("-it-4bit", "").replace("-", " ").upper()
     started = time.perf_counter()
     try:
         epoch = agent.browser.evaluate("performance.timeOrigin+performance.now()")
@@ -154,7 +155,7 @@ def record(output=None, *, scenario=None, url=None, goal=None, expected=None):
         result["runtime"] = runtime_versions()
         result["inference"] = {"backend": engine.backend, "device": str(engine.device), "dtype": str(engine.dtype)}
         result["model"] = engine.name
-        result["model_label"] = model_label.removeprefix("LOCAL ")
+        result["model_label"] = model_label.removeprefix(model_prefix)
         result["model_revision"] = engine.revision
         result["browser_locale"] = agent.browser.locale
         result["browser_headless"] = agent.browser.headless
@@ -168,6 +169,8 @@ def record(output=None, *, scenario=None, url=None, goal=None, expected=None):
             )),
         }
         result["timing_boundary"] = (
+            "After initial navigation/observation; all API calls, decisions, text, actions, waits."
+            if engine.backend == "codex" else
             "Warm model, after initial navigation/observation; all planning, decisions, text, actions, waits."
         )
         result["source_hashes"] = source_hashes
